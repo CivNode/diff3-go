@@ -1,0 +1,17 @@
+# Binaries
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+diff3-go
+
+# Test binary and coverage
+*.test
+*.out
+coverage.out
+coverage*.out
+
+# Go workspace
+go.work
+go.work.sum
