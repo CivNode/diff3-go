@@ -41,9 +41,6 @@ func Diff(a, b []string) []Hunk {
 	ia, ib := 0, 0
 
 	emit := func(kind Kind, lines []string) {
-		if len(lines) == 0 {
-			return
-		}
 		if len(hunks) > 0 && hunks[len(hunks)-1].Kind == kind {
 			hunks[len(hunks)-1].Lines = append(hunks[len(hunks)-1].Lines, lines...)
 			return
@@ -115,27 +112,14 @@ func editScript(a, b []string, n, m int) []byte {
 		}
 	}
 
-	if foundD < 0 {
-		// Unreachable for finite inputs; fall back.
-		ops := make([]byte, 0, n+m)
-		for range a {
-			ops = append(ops, 'd')
-		}
-		for range b {
-			ops = append(ops, 'i')
-		}
-		return ops
-	}
+	// Invariant: for any finite n+m the Myers forward pass reaches done=true
+	// by d=n+m at the latest (pure delete-then-insert path). The loop above
+	// runs d=0..max where max=n+m, so foundD is always set when we reach here.
 
 	// getV reads V[k] from the snapshot at edit distance d.
+	// d is always in [0, foundD] because the backtrack loop runs d=foundD..1
+	// (condition d>0), so d-1 reaches 0 but never goes negative.
 	getV := func(d, k int) int {
-		if d < 0 {
-			// Before any edits, V[0]=0 and all others are effectively -inf.
-			if k == 0 {
-				return 0
-			}
-			return -1
-		}
 		idx := k + d
 		if idx < 0 || idx >= len(trace[d]) {
 			return -1
