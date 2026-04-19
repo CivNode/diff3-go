@@ -10,7 +10,7 @@ Three-way text merge with Git-compatible conflict markers, written in Go.
 go get github.com/CivNode/diff3-go
 ```
 
-Requires Go 1.22 or later. No non-stdlib dependencies.
+Requires Go 1.22 or later (minimum declared in `go.mod`). No non-stdlib dependencies.
 
 ## Quick start
 
@@ -98,15 +98,15 @@ result, _, _ := diff3.Merge(ancestor, a, b, diff3.Options{
 
 ## Benchmarks
 
-Measured on an AMD Ryzen 9 3950X (amd64, Go 1.26):
+Measured on an AMD Ryzen 9 3950X (amd64, Go 1.22):
 
 ```
-BenchmarkMerge10KB-32     49492     77108 ns/op    98.04 MB/s    130392 B/op      369 allocs/op
-BenchmarkMerge100KB-32     3954    917180 ns/op    83.83 MB/s   1635009 B/op     2753 allocs/op
-BenchmarkMerge2MB-32        139  27114263 ns/op    58.08 MB/s  46448906 B/op    24062 allocs/op
+BenchmarkMerge10KB-32     84654     69542 ns/op    108.71 MB/s   130392 B/op      369 allocs/op
+BenchmarkMerge100KB-32     6870    920890 ns/op     83.50 MB/s  1635010 B/op     2753 allocs/op
+BenchmarkMerge2MB-32        158  39127031 ns/op     53.60 MB/s 68615110 B/op    31968 allocs/op
 ```
 
-The 2 MB benchmark uses a 1.7 MB file (26 000 lines) with a conflict every 50 lines.
+The 2 MB benchmark uses a true 2.000 MB file (34 562 lines) with a conflict every 50 lines.
 Time complexity is O(N * D) where D is the edit distance; performance degrades with
 denser edits.
 

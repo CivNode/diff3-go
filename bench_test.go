@@ -52,12 +52,12 @@ func BenchmarkMerge100KB(b *testing.B) {
 	}
 }
 
-// BenchmarkMerge2MB benchmarks a ~2 MB three-way merge targeting <20 ms.
-// The input has many overlapping hunks (every 50th line conflicts) — a realistic
+// BenchmarkMerge2MB benchmarks a true 2 MB three-way merge targeting <20 ms.
+// The input has many overlapping hunks (every 50th line conflicts) - a realistic
 // worst case for a large source file where two engineers edit different parts of
 // the same function repeatedly.
 func BenchmarkMerge2MB(b *testing.B) {
-	ancestor := generateText(26000, "anc") // ~1.7 MB
+	ancestor := generateText(34562, "anc") // 2.000 MB
 	// Changes every 50th line on each side — realistic many-conflict scenario.
 	a := generateConflictingText(ancestor, 50, "[a]")
 	bText := generateConflictingText(ancestor, 50, "[b]") // same positions -> conflicts
