@@ -1,0 +1,2 @@
+# Preserve exact bytes in test fixtures - no LF normalization.
+testdata/fixtures/** -text
