@@ -3,7 +3,8 @@
 // The algorithm computes the shortest edit script (SES) between two slices of
 // strings and returns a sequence of hunks classifying each region as Equal,
 // Insert, or Delete. The implementation follows the original O(ND) paper by
-// Eugene W. Myers (1986).
+// Eugene W. Myers (1986) with a compact per-step trace to keep memory at O(D^2)
+// rather than O(N*D).
 package myers
 
 // Kind identifies the type of a diff hunk.
@@ -34,9 +35,7 @@ func Diff(a, b []string) []Hunk {
 		return nil
 	}
 
-	// editScript returns a sequence of ops: 'e' (equal), 'd' (delete), 'i' (insert).
-	// Each op is applied once to move through (a,b) in lock-step.
-	script := editScript(a, b)
+	script := editScript(a, b, n, m)
 
 	var hunks []Hunk
 	ia, ib := 0, 0
@@ -71,110 +70,133 @@ func Diff(a, b []string) []Hunk {
 	return hunks
 }
 
-// editScript runs Myers and returns a flat op-code slice.
-func editScript(a, b []string) []byte {
-	n := len(a)
-	m := len(b)
-	max := n + m + 1
+// editScript runs the Myers algorithm and returns the op-code sequence.
+func editScript(a, b []string, n, m int) []byte {
+	max := n + m
+	offset := max + 1
+	v := make([]int, 2*max+3)
 
-	// v[k+max] = furthest-right x on diagonal k.
-	v := make([]int, 2*max+1)
+	// trace[d] = copy of v's active diagonals AFTER step d's forward pass.
+	// trace[d] stores 2*d+1 values for diagonals k=-d..d.
+	trace := make([][]int, 0, max+1)
 
-	// trace[d] stores a copy of v after each edit distance d is explored.
-	trace := make([][]int, 0, n+m+1)
+	foundD := -1
 
-	for d := 0; d <= n+m; d++ {
-		snap := make([]int, len(v))
-		copy(snap, v)
-		trace = append(trace, snap)
-
+	for d := 0; d <= max; d++ {
+		// Forward pass for edit distance d.
+		done := false
 		for k := -d; k <= d; k += 2 {
 			var x int
-			if k == -d || (k != d && v[max+k-1] < v[max+k+1]) {
-				x = v[max+k+1]
+			if k == -d || (k != d && v[offset+k-1] < v[offset+k+1]) {
+				x = v[offset+k+1]
 			} else {
-				x = v[max+k-1] + 1
+				x = v[offset+k-1] + 1
 			}
 			y := x - k
 			for x < n && y < m && a[x] == b[y] {
 				x++
 				y++
 			}
-			v[max+k] = x
+			v[offset+k] = x
 			if x >= n && y >= m {
-				// Backtrack from (n,m) through the trace to build the script.
-				return backtrack(trace, a, b, n, m, max)
+				done = true
 			}
 		}
+		// Snapshot the active diagonals after this pass.
+		snap := make([]int, 2*d+1)
+		for k := -d; k <= d; k++ {
+			snap[k+d] = v[offset+k]
+		}
+		trace = append(trace, snap)
+
+		if done {
+			foundD = d
+			break
+		}
 	}
-	// Unreachable for finite inputs.
-	return nil
-}
 
-// backtrack reconstructs the edit script by walking backwards through the trace.
-func backtrack(trace [][]int, a, b []string, x, y, max int) []byte {
-	// We'll build the script in reverse and flip at the end.
-	var rev []byte
+	if foundD < 0 {
+		// Unreachable for finite inputs; fall back.
+		ops := make([]byte, 0, n+m)
+		for range a {
+			ops = append(ops, 'd')
+		}
+		for range b {
+			ops = append(ops, 'i')
+		}
+		return ops
+	}
 
-	for d := len(trace) - 1; d > 0; d-- {
-		snap := trace[d]
+	// getV reads V[k] from the snapshot at edit distance d.
+	getV := func(d, k int) int {
+		if d < 0 {
+			// Before any edits, V[0]=0 and all others are effectively -inf.
+			if k == 0 {
+				return 0
+			}
+			return -1
+		}
+		idx := k + d
+		if idx < 0 || idx >= len(trace[d]) {
+			return -1
+		}
+		return trace[d][idx]
+	}
+
+	// Backtrack from (n,m) to (0,0).
+	ops := make([]byte, 0, n+m)
+	x, y := n, m
+
+	for d := foundD; d > 0; d-- {
 		k := x - y
 
+		// Determine the previous diagonal using trace[d-1].
 		var prevK int
-		if k == -d || (k != d && snap[max+k-1] < snap[max+k+1]) {
-			prevK = k + 1
+		vm1 := getV(d-1, k-1)
+		vp1 := getV(d-1, k+1)
+		if k == -d || (k != d && vm1 < vp1) {
+			prevK = k + 1 // came via insert (moved down)
 		} else {
-			prevK = k - 1
+			prevK = k - 1 // came via delete (moved right)
 		}
-		prevX := snap[max+prevK]
+
+		prevX := getV(d-1, prevK)
 		prevY := prevX - prevK
 
-		// Snake: from (prevX,prevY) to wherever the edit step ended, then diagonal.
-		// The edit step goes from (prevX,prevY) → one step right or down.
-		// Then the snake carries us from that point to (x,y).
-
-		// Emit snake steps (equal) from bottom of snake back to start of snake.
-		// The snake start is at (prevX+1, prevY) [delete] or (prevX, prevY+1) [insert].
-		var snakeStartX, snakeStartY int
-		if prevK == k-1 {
-			// We moved right (delete) from (prevX,prevY) to (prevX+1,prevY).
-			snakeStartX = prevX + 1
-			snakeStartY = prevY
+		// The edit step ends at (afterX, afterY); then a snake takes us to (x,y).
+		var afterX int
+		if prevK < k {
+			// delete: moved right from (prevX,prevY) to (prevX+1,prevY).
+			afterX = prevX + 1
 		} else {
-			// We moved down (insert) from (prevX,prevY) to (prevX,prevY+1).
-			snakeStartX = prevX
-			snakeStartY = prevY + 1
+			// insert: moved down from (prevX,prevY) to (prevX,prevY+1).
+			afterX = prevX
 		}
 
-		// Emit equal steps from (x,y) back to (snakeStartX,snakeStartY).
-		for x > snakeStartX && y > snakeStartY {
-			x--
-			y--
-			rev = append(rev, 'e')
+		// Snake from (afterX,afterY) to (x,y) — all equal.
+		for i := 0; i < x-afterX; i++ {
+			ops = append(ops, 'e')
 		}
 
-		// Emit the edit step.
-		if prevK == k-1 {
-			// delete step
-			x = prevX
-			rev = append(rev, 'd')
+		// Emit the edit.
+		if prevK < k {
+			ops = append(ops, 'd')
 		} else {
-			// insert step
-			y = prevY
-			rev = append(rev, 'i')
+			ops = append(ops, 'i')
 		}
+
+		x = prevX
+		y = prevY
 	}
 
-	// Any remaining movement from (x,y) back to (0,0) is all equal (initial snake).
-	for x > 0 && y > 0 {
-		x--
-		y--
-		rev = append(rev, 'e')
+	// Initial snake: (0,0) to (x,y) — all equal (from d=0 snake).
+	for i := 0; i < x; i++ {
+		ops = append(ops, 'e')
 	}
 
-	// Reverse the script.
-	for i, j := 0, len(rev)-1; i < j; i, j = i+1, j-1 {
-		rev[i], rev[j] = rev[j], rev[i]
+	// Ops were built end-to-start; reverse.
+	for i, j := 0, len(ops)-1; i < j; i, j = i+1, j-1 {
+		ops[i], ops[j] = ops[j], ops[i]
 	}
-	return rev
+	return ops
 }

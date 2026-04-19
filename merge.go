@@ -190,7 +190,10 @@ func buildPosData(hunks []myers.Hunk, ancN int) []posState {
 			}
 
 		case myers.Insert:
-			// Pure insert before ancIdx.
+			// Pure insert before ancIdx. The guard slot>ancN is a safety cap:
+			// in practice ancIdx never exceeds ancN because Myers diff only
+			// produces equal ops up to ancN, but malformed external hunks
+			// could violate this invariant.
 			slot := ancIdx
 			if slot > ancN {
 				slot = ancN
