@@ -1,0 +1,6 @@
+line1
+<<<<<<< 
+=======
+shared_modified
+>>>>>>>
+line3

@@ -1,0 +1,6 @@
+Hello, 世界
+<<<<<<< 
+Added by A: café
+=======
+Added by B: naïve
+>>>>>>>

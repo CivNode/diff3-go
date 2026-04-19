@@ -1,0 +1,7 @@
+line1
+<<<<<<< 
+modified_by_A
+=======
+modified_by_B
+>>>>>>>
+line3

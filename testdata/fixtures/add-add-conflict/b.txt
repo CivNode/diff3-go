@@ -1,0 +1,3 @@
+line1
+ADDED_BY_B
+line2

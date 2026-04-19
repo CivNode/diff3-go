@@ -1,0 +1,5 @@
+<<<<<<< 
+content_from_A
+=======
+content_from_B
+>>>>>>>

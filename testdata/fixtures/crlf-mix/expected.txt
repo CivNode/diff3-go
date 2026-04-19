@@ -1,0 +1,7 @@
+line1
+<<<<<<< 
+modified
+=======
+line2
+>>>>>>>
+line3

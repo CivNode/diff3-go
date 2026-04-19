@@ -1,0 +1,7 @@
+line1
+<<<<<<< 
+ADDED_BY_A
+=======
+ADDED_BY_B
+>>>>>>>
+line2
